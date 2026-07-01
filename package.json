@@ -1,0 +1,12 @@
+{
+  "name": "nh3-server",
+  "version": "1.0.0",
+  "description": "NH3 Sensor Web Dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

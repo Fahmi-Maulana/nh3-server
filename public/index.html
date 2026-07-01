@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NH3 Sensor Dashboard (CasaOS)</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* DEFINISI TEMA (CSS VARIABLES) */
+    :root {
+      --bg-main: #0d1117;
+      --text-main: #c9d1d9;
+      --bg-card: #161b22;
+      --border-color: #30363d;
+      --text-muted: #8b949e;
+      --text-highlight: #58a6ff;
+      --val-color: #e6edf3;
+      --bg-input: #0d1117;
+      --badge-off-bg: #1c2128;
+      --badge-off-text: #6e7681;
+      --sep-color: #21262d;
+    }
+
+    body.light-mode {
+      --bg-main: #f6f8fa;
+      --text-main: #24292f;
+      --bg-card: #ffffff;
+      --border-color: #d0d7de;
+      --text-muted: #57606a;
+      --text-highlight: #0969da;
+      --val-color: #24292f;
+      --bg-input: #ffffff;
+      --badge-off-bg: #eaeef2;
+      --badge-off-text: #57606a;
+      --sep-color: #d0d7de;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Courier New', monospace; background: var(--bg-main); color: var(--text-main); font-size: 13px; transition: background 0.3s, color 0.3s; }
+    header { background: var(--bg-card); border-bottom: 1px solid var(--border-color); padding: 10px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; transition: background 0.3s; }
+    header h1 { color: var(--text-highlight); font-size: 15px; flex: 1; }
+    
+    .badge { padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+    .b-ok { background: #0d4429; color: #3fb950; }
+    .b-warn { background: #3d1f00; color: #ffa657; }
+    .b-err { background: #3d0000; color: #f85149; }
+    .b-off { background: var(--badge-off-bg); color: var(--badge-off-text); }
+    
+    main { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; max-width: 1200px; margin: 0 auto; }
+    @media(max-width: 700px) { main { grid-template-columns: 1fr; } }
+    
+    .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; transition: background 0.3s; }
+    .card h2 { color: var(--text-highlight); font-size: 12px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--sep-color); padding-bottom: 6px; }
+    
+    table { width: 100%; border-collapse: collapse; }
+    td, th { padding: 4px 6px; text-align: left; border-bottom: 1px solid var(--sep-color); }
+    th { color: var(--text-muted); font-weight: normal; font-size: 11px; }
+    
+    .val { color: var(--val-color); font-weight: bold; }
+    .good { color: #3fb950; }
+    .warn { color: #ffa657; }
+    .err { color: #f85149; }
+    
+    .btn { display: inline-block; padding: 6px 14px; border-radius: 5px; border: none; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: bold; text-align: center; min-width: 70px; transition: opacity 0.2s;}
+    .btn:hover { opacity: 0.8; }
+    .btn-g { background: #1a7f37; color: #fff; } 
+    .btn-r { background: #6e1a1a; color: #fff; } 
+    .btn-b { background: #0d419d; color: #fff; } 
+    .btn-y { background: #6e4c00; color: #fff; } 
+    .btn-gr { background: var(--sep-color); color: var(--text-muted); } 
+    .btn-theme { background: var(--bg-input); border: 1px solid var(--border-color); color: var(--val-color); }
+
+    .row-btn { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    input[type=text], input[type=number] { background: var(--bg-input); border: 1px solid var(--border-color); color: var(--val-color); padding: 5px 8px; border-radius: 4px; font-family: inherit; font-size: 12px; width: 100%; }
+    label { color: var(--text-muted); font-size: 11px; display: block; margin-bottom: 2px; margin-top: 8px; }
+    
+    .progress { background: var(--sep-color); border-radius: 4px; height: 10px; overflow: hidden; margin: 6px 0; }
+    .progress-bar { background: #1a7f37; height: 100%; transition: width 0.5s; }
+    
+    .r0-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px; }
+    .r0-item { background: var(--bg-input); border-radius: 4px; padding: 5px 8px; border: 1px solid var(--border-color); }
+    .r0-item .lbl { color: var(--text-muted); font-size: 10px; }
+    .r0-item .v { color: var(--val-color); font-size: 13px; font-weight: bold; }
+    
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+    .dot-on { background: #3fb950; animation: pulse 1.5s infinite; }
+    .dot-off { background: var(--text-muted); }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    
+    #log { background: var(--bg-input); border: 1px solid var(--sep-color); border-radius: 4px; padding: 8px; height: 100px; overflow-y: auto; font-size: 11px; color: var(--text-muted); margin-top: 8px; }
+    
+    .full-w { grid-column: 1 / -1; }
+    .sensor-val { font-size: 15px; font-weight: bold; color: var(--val-color); }
+    .sensor-sub { font-size: 10px; color: var(--text-muted); }
+    .sensor-ppm { font-size: 13px; color: #ffa657; font-weight: bold; margin-top: 4px; margin-bottom: 2px; }
+    
+    .sensor-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
+    .sys-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    @media(max-width: 500px) { .sensor-grid { grid-template-columns: 1fr 1fr; } .sys-grid { grid-template-columns: 1fr; } }
+    
+    .sensor-box { background: var(--bg-input); border-radius: 6px; padding: 8px; text-align: center; border: 1px solid var(--sep-color); }
+    .sep { border-top: 1px solid var(--sep-color); margin: 8px 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🧪 NH3 Gas Detection System</h1>
+  <button class="btn btn-theme" id="btn-theme" onclick="toggleTheme()">☀️ Light</button>
+  <span class="badge b-err" id="b-esp">ESP: OFFLINE</span>
+  <span class="badge b-off" id="b-wifi">WiFi</span>
+  <span class="badge b-off" id="b-stream">IDLE</span>
+  <span class="badge b-off" id="b-calib">UNCAL</span>
+  <span class="badge b-off" id="b-heater">HEATER</span>
+  <span style="color:var(--text-muted); font-size:11px" id="hdr-uptime">--</span>
+</header>
+
+<main>
+  <div class="card full-w">
+    <h2><span class="live-dot dot-off" id="live-dot"></span>Live Sensor Readings</h2>
+    <div class="sensor-grid">
+      <div class="sensor-box">
+        <div class="sensor-sub">MQ-137 NH₃</div>
+        <div class="sensor-val" id="sv-ratio-mq">--</div>
+        <div class="sensor-sub">Rs/R0</div>
+        <div class="sensor-ppm" id="sv-ppm-mq">PPM: --</div>
+        <div class="sensor-sub" id="sv-rs-mq">Rs: --</div>
+        <div class="sensor-sub" id="sv-v-mq">V: --</div>
+      </div>
+      <div class="sensor-box">
+        <div class="sensor-sub">TGS2602 VOC</div>
+        <div class="sensor-val" id="sv-ratio-tgs">--</div>
+        <div class="sensor-sub">Rs/R0</div>
+        <div class="sensor-ppm" id="sv-ppm-tgs">PPM: --</div>
+        <div class="sensor-sub" id="sv-rs-tgs">Rs: --</div>
+        <div class="sensor-sub" id="sv-v-tgs">V: --</div>
+      </div>
+      <div class="sensor-box">
+        <div class="sensor-sub">MICS-6814 NH₃</div>
+        <div class="sensor-val" id="sv-ratio-mn3">--</div>
+        <div class="sensor-sub">Rs/R0</div>
+        <div class="sensor-ppm" id="sv-ppm-mn3">PPM: --</div>
+        <div class="sensor-sub" id="sv-rs-mn3">Rs: --</div>
+        <div class="sensor-sub" id="sv-v-mn3">V: --</div>
+      </div>
+      <div class="sensor-box">
+        <div class="sensor-sub">MICS-6814 RED</div>
+        <div class="sensor-val" id="sv-ratio-mrd">--</div>
+        <div class="sensor-sub">Rs/R0</div>
+        <div class="sensor-ppm" id="sv-ppm-mrd">PPM: --</div>
+        <div class="sensor-sub" id="sv-rs-mrd">Rs: --</div>
+        <div class="sensor-sub" id="sv-v-mrd">V: --</div>
+      </div>
+    </div>
+    <div style="display:flex; gap:16px; margin-top:10px; flex-wrap:wrap">
+      <span>🌡️ <span class="val" id="sv-temp">--</span> °C</span>
+      <span>💧 <span class="val" id="sv-hum">--</span> %RH</span>
+      <span style="color:var(--text-muted); font-size:11px" id="sv-sht-status">--</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📊 Dataset Stream</h2>
+    <div style="margin-bottom:6px">
+      <span style="color:var(--text-muted); font-size:11px">Status: </span>
+      <span id="stream-status" class="err">STOPPED</span>
+      &nbsp;|&nbsp;
+      <span style="color:var(--text-muted); font-size:11px">Baris sesi: </span>
+      <span id="stream-rows" class="val">0</span>
+    </div>
+    <div class="row-btn">
+      <button class="btn btn-g" onclick="cmd('s')">▶ Mulai Stream</button>
+      <button class="btn btn-r" onclick="cmd('x')">■ Stop Stream</button>
+    </div>
+    <div class="sep"></div>
+    <label>Label Kelas (class_name)</label>
+    <input type="text" id="inp-label" value="AMAN" placeholder="AMAN / BAHAYA_RENDAH / dst">
+    <div class="row-btn"><button class="btn btn-b" onclick="setLabel()">Set Label</button></div>
+    <label>Class Label (integer)</label>
+    <div style="display:flex; gap:6px">
+      <input type="number" id="inp-class" value="0" min="0" max="9" style="width:80px">
+      <button class="btn btn-b" onclick="cmd('cl', document.getElementById('inp-class').value)">Set</button>
+    </div>
+    <label>ppm_actual (konsentrasi referensi)</label>
+    <div style="display:flex; gap:6px">
+      <input type="number" id="inp-ppm" value="0.0" step="0.1" min="0">
+      <button class="btn btn-b" onclick="cmd('ppm', document.getElementById('inp-ppm').value)">Set</button>
+    </div>
+    <div id="log"></div>
+  </div>
+
+  <div class="card">
+    <h2>🔥 Heater Control</h2>
+    <table>
+      <tr><th>Sensor</th><th>GPIO</th><th>Status</th><th>Aksi</th></tr>
+      <tr><td>MQ-137</td><td>25</td><td><span id="h-mq-st" class="err">--</span></td><td><button class="btn btn-y" onclick="cmd('h1')">Toggle</button></td></tr>
+      <tr><td>TGS2602</td><td>26</td><td><span id="h-tgs-st" class="err">--</span></td><td><button class="btn btn-y" onclick="cmd('h2')">Toggle</button></td></tr>
+      <tr><td>MICS-6814</td><td>—</td><td><span class="good">AUTO</span></td><td><span style="color:var(--text-muted); font-size:11px">Internal heater</span></td></tr>
+    </table>
+    <div class="row-btn" style="margin-top:10px">
+      <button class="btn btn-g" onclick="cmd('h')">▲ Semua ON</button>
+      <button class="btn btn-r" onclick="cmd('H')">▼ Semua OFF</button>
+    </div>
+    <div style="background:var(--bg-input); border:1px solid var(--border-color); border-radius:4px; padding:8px; margin-top:10px; font-size:11px; color:var(--text-muted)">
+      ⚠️ MQ-137 warm-up: ~5 menit<br>
+      ⚠️ TGS2602 warm-up: ~5 menit<br>
+      ⚠️ Lakukan kalibrasi SETELAH warm-up
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>⚖️ Kalibrasi R0</h2>
+    <div style="margin-bottom:8px; font-size:11px; color:var(--text-muted)">
+      Kalibrasi 30 sampel × 1s di udara bersih.<br>
+      Heater harus ON dan warm-up ≥5 menit.
+    </div>
+    <div id="cal-status-txt" class="err">--</div>
+    
+    <div id="cal-progress-wrap" style="display:none">
+      <div class="progress">
+        <div class="progress-bar" id="cal-bar" style="width:0%"></div>
+      </div>
+      <span id="cal-progress-txt" style="font-size:11px; color:var(--text-muted)">0 / 30</span>
+    </div>
+    
+    <div class="row-btn" style="margin-top:8px">
+      <button class="btn btn-b" onclick="cmd('c')" id="btn-cal">Mulai Kalibrasi</button>
+    </div>
+    
+    <div class="r0-grid" id="r0-display" style="display:none">
+      <div class="r0-item"><div class="lbl">R0 MQ-137</div><div class="v" id="r0-mq">--</div></div>
+      <div class="r0-item"><div class="lbl">R0 TGS2602</div><div class="v" id="r0-tgs">--</div></div>
+      <div class="r0-item"><div class="lbl">R0 MICS NH3</div><div class="v" id="r0-mn3">--</div></div>
+      <div class="r0-item"><div class="lbl">R0 MICS RED</div><div class="v" id="r0-mrd">--</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>💾 Dataset File (CasaOS HDD)</h2>
+    <table>
+      <tr><th>File</th><td class="val">/dataset.csv</td></tr>
+      <tr><th>Ukuran</th><td class="val" id="f-size">--</td></tr>
+      <tr><th>Est. Baris</th><td class="val" id="f-rows">--</td></tr>
+    </table>
+    <div class="row-btn" style="margin-top:10px">
+      <a class="btn btn-g" href="/dataset.csv" download="dataset_nh3.csv">⬇ Download CSV</a>
+      <button class="btn btn-r" onclick="clearFile()">🗑 Hapus Dataset</button>
+    </div>
+    <div style="font-size:10px; color:var(--text-muted); margin-top:6px">
+      Disimpan secara aman di hardisk server CasaOS.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>⚙️ System Info (ESP32 Node)</h2>
+    <table>
+      <tr><th>WiFi SSID</th><td class="val" id="s-ssid">--</td></tr>
+      <tr><th>IP Address</th><td class="val" id="s-ip">--</td></tr>
+      <tr><th>RSSI</th><td class="val" id="s-rssi">--</td></tr>
+      <tr><th>Uptime</th><td class="val" id="s-uptime">--</td></tr>
+      <tr><th>Free Heap</th><td class="val" id="s-heap">--</td></tr>
+      <tr><th>ADS1220</th><td><span id="s-ads" class="val">--</span></td></tr>
+      <tr><th>SHT-31</th><td><span id="s-sht" class="val">--</span></td></tr>
+    </table>
+    <div class="row-btn" style="margin-top:10px;">
+      <button class="btn btn-gr" onclick="if(confirm('Yakin reboot modul ESP32?'))cmd('reboot')">🔄 Reboot Node</button>
+      <button class="btn btn-gr" onclick="if(confirm('Hapus kredensial WiFi? Modul akan masuk ke Mode Setup (Access Point) dan ter-reset.'))cmd('wifi_reset')">WiFi Reset</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📈 Tren Semua Sensor (Rs/R0)</h2>
+    <div style="position:relative; height:185px; width:100%">
+      <canvas id="allChart"></canvas>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  // --- MANAJEMEN TEMA (DARK/LIGHT MODE) ---
+  const themeBtn = document.getElementById('btn-theme');
+  const body = document.body;
+  const savedTheme = localStorage.getItem('theme');
+  if (savedTheme === 'light') { body.classList.add('light-mode'); themeBtn.textContent = '🌙 Dark'; }
+  function toggleTheme() {
+    body.classList.toggle('light-mode');
+    const isLight = body.classList.contains('light-mode');
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+    themeBtn.textContent = isLight ? '🌙 Dark' : '☀️ Light';
+    updateChartTheme(isLight);
+  }
+  function updateChartTheme(isLight) {
+    if(!allChartObj) return;
+    const gridColor = isLight ? '#d0d7de' : '#30363d';
+    const textColor = isLight ? '#57606a' : '#8b949e';
+    allChartObj.options.scales.y.grid.color = gridColor;
+    allChartObj.options.scales.y.ticks.color = textColor;
+    allChartObj.options.plugins.legend.labels.color = textColor;
+    allChartObj.update('none');
+  }
+
+  // --- LOGIKA UTAMA DASHBOARD ---
+  var last_data = {};
+  var allChartObj = null;
+  const MAX_PTS = 20;
+
+  function initChart() {
+    var ctx = document.getElementById('allChart');
+    if(!ctx) return;
+    const isLight = document.body.classList.contains('light-mode');
+    const gridColor = isLight ? '#d0d7de' : '#30363d';
+    const textColor = isLight ? '#57606a' : '#8b949e';
+    allChartObj = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: Array(MAX_PTS).fill(""),
+        datasets: [
+          { label: 'MQ-137', borderColor: '#3fb950', data: Array(MAX_PTS).fill(null), borderWidth: 2, pointRadius: 0, tension: 0.3 },
+          { label: 'TGS2602', borderColor: '#ffa657', data: Array(MAX_PTS).fill(null), borderWidth: 2, pointRadius: 0, tension: 0.3 },
+          { label: 'MICS-NH3', borderColor: '#0969da', data: Array(MAX_PTS).fill(null), borderWidth: 2, pointRadius: 0, tension: 0.3 },
+          { label: 'MICS-RED', borderColor: '#f85149', data: Array(MAX_PTS).fill(null), borderWidth: 2, pointRadius: 0, tension: 0.3 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        scales: { x: { display: false }, y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } } } },
+        plugins: { legend: { display: true, labels: { color: textColor, boxWidth: 10, font: { size: 10 } } } }
+      }
+    });
+  }
+
+  function $(id) { return document.getElementById(id); }
+  function txt(id, v) { var e = $(id); if(e) e.textContent = v; }
+
+  function logMsg(m) {
+    var d = $('log'); if(!d) return;
+    var t = new Date().toLocaleTimeString('id', { hour12: false });
+    var div = document.createElement('div');
+    div.textContent = '[' + t + '] ' + m;
+    d.appendChild(div);
+    if(d.childNodes.length > 50) d.removeChild(d.firstChild);
+    d.scrollTop = d.scrollHeight;
+  }
+
+  function cmd(c, v) {
+    var url = '/api/cmd?cmd=' + encodeURIComponent(c);
+    if(v !== undefined && v !== '') url += '&val=' + encodeURIComponent(v);
+    fetch(url).then(r => r.json()).then(d => { if(d.msg) logMsg(d.msg); }).catch(e => logMsg('ERR: ' + e));
+  }
+
+  function setLabel() {
+    var v = $('inp-label').value.trim();
+    if(!v) { alert('Label tidak boleh kosong'); return; }
+    cmd('label', v);
+  }
+
+  function clearFile() {
+    if(!confirm('Hapus semua data dataset dari server? Tidak bisa di-undo!')) return;
+    cmd('file_clear');
+  }
+
+  function fmtTime(s) {
+    var h = Math.floor(s / 3600);
+    var m = Math.floor((s % 3600) / 60);
+    var sec = s % 60;
+    return h + 'h ' + ('0' + m).slice(-2) + 'm ' + ('0' + sec).slice(-2) + 's';
+  }
+
+  function colorRatio(v) {
+    if(v < 0) return '';
+    if(v < 0.5) return 'warn';
+    if(v > 2.0) return 'err';
+    return 'good';
+  }
+
+  function updateUI(d) {
+    if(!d || Object.keys(d).length === 0) return;
+    last_data = d;
+    let isEspOnline = d.esp_connected === true;
+
+    var sb = $('b-stream'); if(sb) { sb.textContent = d.stream ? '▶ STREAMING' : '■ IDLE'; sb.className = 'badge ' + (d.stream ? 'b-ok' : 'b-off'); }
+    var ss = $('stream-status'); if(ss) { ss.textContent = d.stream ? 'STREAMING' : 'STOPPED'; ss.className = d.stream ? 'good' : 'err'; }
+    txt('stream-rows', d.rows_sess || 0);
+    txt('f-size', (d.file_kb || 0).toFixed(2) + ' KB'); txt('f-rows', d.file_rows || 0);
+
+    if(d.label !== undefined && $('inp-label') && document.activeElement !== $('inp-label')) $('inp-label').value = d.label;
+    if(d.class_label !== undefined && $('inp-class') && document.activeElement !== $('inp-class')) $('inp-class').value = d.class_label;
+    if(d.ppm !== undefined && $('inp-ppm') && document.activeElement !== $('inp-ppm')) $('inp-ppm').value = d.ppm;
+
+    var espb = $('b-esp'); if(espb) { espb.textContent = isEspOnline ? 'ESP: ONLINE' : 'ESP: OFFLINE'; espb.className = 'badge ' + (isEspOnline ? 'b-ok' : 'b-err'); }
+    var ld = $('live-dot'); if(ld) ld.className = 'live-dot ' + (isEspOnline ? 'dot-on' : 'dot-off');
+
+    if (!isEspOnline) {
+      // CLEAR JIKA ESP OFFLINE
+      var wb = $('b-wifi'); if(wb) { wb.textContent = 'WiFi: --'; wb.className = 'badge b-err'; }
+      var cb = $('b-calib'); if(cb) { cb.textContent = 'UNCAL'; cb.className = 'badge b-warn'; }
+      var hb = $('b-heater'); if(hb) { hb.textContent = 'HEATER: --'; hb.className = 'badge b-off'; }
+      txt('hdr-uptime', '--');
+
+      function clearSv(ratioId, rsId, vId, ppmId) {
+          let re = $(ratioId); if(re) { re.textContent = '--'; re.className = 'sensor-val'; }
+          txt(rsId, 'Rs: --'); txt(vId, 'V: --'); txt(ppmId, 'PPM: --');
+      }
+      clearSv('sv-ratio-mq', 'sv-rs-mq', 'sv-v-mq', 'sv-ppm-mq'); clearSv('sv-ratio-tgs', 'sv-rs-tgs', 'sv-v-tgs', 'sv-ppm-tgs');
+      clearSv('sv-ratio-mn3', 'sv-rs-mn3', 'sv-v-mn3', 'sv-ppm-mn3'); clearSv('sv-ratio-mrd', 'sv-rs-mrd', 'sv-v-mrd', 'sv-ppm-mrd');
+      txt('sv-temp', '--'); txt('sv-hum', '--'); txt('sv-sht-status', '--');
+
+      function hSt(id) { var e = $(id); if(e) { e.textContent = '--'; e.className = 'err'; } }
+      hSt('h-mq-st'); hSt('h-tgs-st');
+
+      var cs = $('cal-status-txt'); if(cs) { cs.textContent = 'ESP Offline'; cs.className = 'err'; }
+      var pw = $('cal-progress-wrap'); if(pw) pw.style.display = 'none';
+      var rd = $('r0-display'); if(rd) rd.style.display = 'none';
+      var btn = $('btn-cal'); if(btn) { btn.disabled = true; btn.textContent = 'Mulai Kalibrasi'; btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed'; }
+
+      txt('s-ssid', '--'); txt('s-ip', '--'); txt('s-rssi', '--'); txt('s-uptime', '--'); txt('s-heap', '--');
+      var sa = $('s-ads'); if(sa) { sa.textContent = '--'; sa.className = 'val'; }
+      var ss2 = $('s-sht'); if(ss2) { ss2.textContent = '--'; ss2.className = 'val'; }
+
+      if(allChartObj) {
+        for(let i=0; i<4; i++) { allChartObj.data.datasets[i].data.push(null); allChartObj.data.datasets[i].data.shift(); }
+        allChartObj.update('none');
+      }
+    } else {
+      // NORMAL JIKA ESP ONLINE
+      var wb = $('b-wifi'); if(wb) { wb.textContent = d.wifi_ok ? 'WiFi: ' + d.wifi : ' No WiFi'; wb.className = 'badge ' + (d.wifi_ok ? 'b-ok' : 'b-err'); }
+      var cb = $('b-calib'); if(cb) { cb.textContent = d.calib ? '✓ KALIBRASI' : 'UNCAL'; cb.className = 'badge ' + (d.calib ? 'b-ok' : 'b-warn'); }
+      var hb = $('b-heater'); var hOn = d.heater_mq || d.heater_tgs;
+      if(hb) { hb.textContent = hOn ? '🔥 HEATER ON' : 'HEATER OFF'; hb.className = 'badge ' + (hOn ? 'b-warn' : 'b-off'); }
+      txt('hdr-uptime', fmtTime(d.uptime || 0));
+
+      function setSv(ratioId, rsId, vId, ppmId, ratio, rs, v, ppm) {
+        var re = $(ratioId);
+        if(re) { re.textContent = ratio < 0 ? 'N/CAL' : ratio.toFixed(4); re.className = 'sensor-val ' + (ratio < 0 ? 'warn' : colorRatio(ratio)); }
+        txt(rsId, 'Rs: ' + (rs > 0 ? rs.toFixed(3) : '--') + ' kΩ');
+        txt(vId, 'V: ' + (v > 0 ? v.toFixed(4) : '--') + ' V');
+        txt(ppmId, (ppm === undefined || ppm < 0) ? 'PPM: --' : 'PPM: ' + ppm.toFixed(2));
+      }
+      setSv('sv-ratio-mq', 'sv-rs-mq', 'sv-v-mq', 'sv-ppm-mq', d.ratio_mq, d.rs_mq, d.v_mq, d.ppm_mq);
+      setSv('sv-ratio-tgs', 'sv-rs-tgs', 'sv-v-tgs', 'sv-ppm-tgs', d.ratio_tgs, d.rs_tgs, d.v_tgs, d.ppm_tgs);
+      setSv('sv-ratio-mn3', 'sv-rs-mn3', 'sv-v-mn3', 'sv-ppm-mn3', d.ratio_mn3, d.rs_mn3, d.v_mn3, d.ppm_mn3);
+      setSv('sv-ratio-mrd', 'sv-rs-mrd', 'sv-v-mrd', 'sv-ppm-mrd', d.ratio_mrd, d.rs_mrd, d.v_mrd, d.ppm_mrd);
+      txt('sv-temp', d.sht_ok ? d.temp.toFixed(2) : 'ERR'); txt('sv-hum', d.sht_ok ? d.hum.toFixed(2) : 'ERR');
+      txt('sv-sht-status', d.sht_ok ? 'SHT-31 OK' : 'SHT-31 ERROR');
+
+      if(allChartObj) {
+        allChartObj.data.datasets[0].data.push(d.ratio_mq >= 0 ? d.ratio_mq : null);
+        allChartObj.data.datasets[1].data.push(d.ratio_tgs >= 0 ? d.ratio_tgs : null);
+        allChartObj.data.datasets[2].data.push(d.ratio_mn3 >= 0 ? d.ratio_mn3 : null);
+        allChartObj.data.datasets[3].data.push(d.ratio_mrd >= 0 ? d.ratio_mrd : null);
+        for(let i = 0; i < 4; i++) allChartObj.data.datasets[i].data.shift();
+        allChartObj.update('none');
+      }
+
+      function hSt(id, on) { var e = $(id); if(e) { e.textContent = on ? 'ON' : 'OFF'; e.className = on ? 'good' : 'err'; } }
+      hSt('h-mq-st', d.heater_mq); hSt('h-tgs-st', d.heater_tgs);
+
+      var cs = $('cal-status-txt');
+      var btn = $('btn-cal');
+      
+      if(cs) {
+        if(d.cal_run) {
+          cs.textContent = 'Berjalan... ' + d.cal_cnt + '/30'; cs.className = 'warn';
+          var pw = $('cal-progress-wrap'); if(pw) pw.style.display = 'block';
+          var bar = $('cal-bar'); if(bar) bar.style.width = Math.round(d.cal_cnt / 30 * 100) + '%';
+          txt('cal-progress-txt', d.cal_cnt + ' / 30');
+          if(btn) { btn.disabled = true; btn.textContent = 'Berjalan...'; btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed'; }
+        } else {
+          var pw = $('cal-progress-wrap'); if(pw) pw.style.display = 'none';
+          
+          if (!d.warmup_ready) {
+             if(btn) { btn.disabled = true; btn.textContent = 'Terkunci (Belum Panas)'; btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed'; }
+             if (d.heater_mq && d.heater_tgs) {
+                 let m = Math.floor(d.warmup_left / 60); let s = d.warmup_left % 60; let sStr = s < 10 ? '0'+s : s;
+                 cs.textContent = `Pemanasan... (Sisa Waktu: ${m}:${sStr})`; cs.className = 'warn';
+             } else {
+                 cs.textContent = 'Heater Belum ON Semua!'; cs.className = 'err';
+             }
+             var rd = $('r0-display'); if(rd) rd.style.display = 'none';
+             
+          } else {
+             if(btn) { btn.disabled = false; btn.textContent = 'Mulai Kalibrasi'; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; }
+             if(d.calib) {
+                cs.textContent = 'Kalibrasi selesai ✓ (Siap Ulang)'; cs.className = 'good';
+                var rd = $('r0-display'); if(rd) rd.style.display = 'grid';
+                txt('r0-mq', d.r0_mq ? d.r0_mq.toFixed(4) + ' kΩ' : '--');
+                txt('r0-tgs', d.r0_tgs ? d.r0_tgs.toFixed(4) + ' kΩ' : '--');
+                txt('r0-mn3', d.r0_mn3 ? d.r0_mn3.toFixed(4) + ' kΩ' : '--');
+                txt('r0-mrd', d.r0_mrd ? d.r0_mrd.toFixed(4) + ' kΩ' : '--');
+             } else {
+                cs.textContent = 'Heater Siap. Belum dikalibrasi.'; cs.className = 'warn';
+                var rd = $('r0-display'); if(rd) rd.style.display = 'none';
+             }
+          }
+        }
+      }
+
+      txt('s-ssid', d.wifi || '--'); txt('s-ip', d.ip || '--'); txt('s-rssi', d.rssi ? d.rssi + ' dBm' : '--');
+      txt('s-uptime', fmtTime(d.uptime || 0)); txt('s-heap', d.heap ? Math.round(d.heap / 1024) + ' KB' : '--');
+      var sa = $('s-ads'); if(sa) { sa.textContent = d.ads_ok ? 'OK' : 'ERROR'; sa.className = 'val ' + (d.ads_ok ? 'good' : 'err'); }
+      var ss2 = $('s-sht'); if(ss2) { ss2.textContent = d.sht_ok ? 'OK' : 'ERROR'; ss2.className = 'val ' + (d.sht_ok ? 'good' : 'err'); }
+    }
+  }
+
+  var isPolling = false;
+  function fetchData() {
+    if(isPolling) return;
+    isPolling = true;
+    fetch('/api/data').then(r => r.json()).then(updateUI).catch(() => {}).finally(() => { isPolling = false; setTimeout(fetchData, 500); });
+  }
+  initChart(); fetchData();
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+services:
+  nh3-server:
+    build: .
+    container_name: nh3-server
+    restart: unless-stopped
+    ports:
+      - "3030:3000"
+    volumes:
+      # Menyimpan file dataset.csv ke folder host agar data tidak hilang
+      - ./dataset.csv:/app/dataset.csv
+      # [PERBAIKAN]: Menyimpan file kalibrasi agar tidak perlu kalibrasi ulang saat direstart
+      - ./calibration.json:/app/calibration.json
+    environment:
+      - TZ=Asia/Jakarta # Sesuaikan dengan zona waktu Anda
