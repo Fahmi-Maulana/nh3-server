@@ -49,70 +49,49 @@
 
 Sistem terdiri dari dua bagian utama: **Firmware ESP32** sebagai *Push Node* yang membaca sensor, dan **Server Node.js** yang memproses data serta menyajikan dashboard web.
 
+### Blok Diagram
+
 ```mermaid
-flowchart TD
-    subgraph HW["🔌 Hardware Layer — ESP32 (NH3_SERVER.ino)"]
-        direction TB
-        ADS["ADS1220\n(ADC 24-bit, SPI)"]
-        MQ["MQ-137\nCH0"]
-        MN3["MiCS-NH3\nCH1"]
-        MRD["MiCS-Red\nCH2"]
-        TGS["TGS-2602\nCH3"]
-        SHT["SHT31\n(Suhu + Humidity, I2C)"]
-        ESP["ESP32\nWiFiManager · ArduinoOTA\nHTTP Client · HTTPS"]
-        HTR["Heater MQ → GPIO25\nHeater TGS → GPIO26\nLED WiFi → GPIO2"]
-
-        MQ & MN3 & MRD & TGS --> ADS
-        ADS --> ESP
-        SHT --> ESP
-        HTR -.->|"dikontrol"| ESP
+flowchart LR
+    subgraph ESP32["🔌 ESP32 — Push Node"]
+        S1["MQ-137"]
+        S2["TGS-2602"]
+        S3["MiCS-NH3"]
+        S4["MiCS-Red"]
+        ADC["ADS1220<br/>(ADC 24-bit)"]
+        SHT["SHT31<br/>(Suhu & Humidity)"]
+        S1 & S2 & S3 & S4 --> ADC
     end
 
-    subgraph SRV["⚙️ Server Layer — Node.js (server.js)"]
-        direction TB
-        UP["POST /api/upload\n─ Hitung Rs\n─ Hitung Ratio Rs/R₀\n─ Estimasi PPM\n─ Simpan ke CSV\n─ Return cmd/val"]
-        DATA["GET /api/data\n(snapshot data terkini)"]
-        CMD["GET /api/cmd\n(kontrol stream / kalibrasi)"]
-        CSV["dataset.csv"]
-        CAL["calibration.json"]
-        UP --> CSV
-        UP --> CAL
+    subgraph Server["⚙️ Node.js Server"]
+        API["POST /api/upload"]
+        PROC["Hitung Rs → Ratio → PPM"]
+        FILE["dataset.csv<br/>calibration.json"]
+        API --> PROC --> FILE
     end
 
-    subgraph CLI["🖥️ Client Layer — Web Dashboard (index.html)"]
-        direction TB
-        DASH["Browser Pengguna\nlocalhost:3030\n─ Status & Info ESP32\n─ Data Sensor Live\n─ Grafik Rs & PPM\n─ Kontrol Stream & Label\n─ Kalibrasi\n─ Dark/Light Mode"]
+    subgraph Dashboard["🖥️ Web Dashboard"]
+        WEB["Browser Pengguna<br/>localhost:3030"]
     end
 
-    ESP -- "HTTP POST\nJSON data mentah" --> UP
-    UP -- "Response\ncmd + val" --> ESP
-    DATA -- "polling /api/data" --> DASH
-    DASH -- "GET /api/cmd" --> CMD
+    ADC -- "Tegangan (V)" --> MCU["ESP32<br/>WiFi + OTA"]
+    SHT -- "Suhu & Hum" --> MCU
+    MCU -- "HTTP POST<br/>JSON setiap 1 detik" --> API
+    API -. "Response: cmd + val" .-> MCU
+    Server -- "GET /api/data<br/>polling 1 detik" --> WEB
+    WEB -- "GET /api/cmd<br/>kontrol pengguna" --> Server
 ```
 
-### 🔁 Alur Data
+### Alur Data
 
 ```mermaid
-sequenceDiagram
-    participant Sensor as Sensor Gas (x4)
-    participant ESP as ESP32
-    participant Server as Node.js Server
-    participant CSV as dataset.csv
-    participant Web as Web Dashboard
-
-    loop Setiap 1 Detik
-        Sensor->>ESP: Baca tegangan (ADS1220, avg 8x)
-        ESP->>Server: HTTP POST /api/upload (JSON)
-        Server->>Server: Hitung Rs, Ratio, PPM
-        alt Stream Aktif
-            Server->>CSV: Tulis baris data
-        end
-        Server-->>ESP: Response cmd/val (heater, reboot, dll.)
-    end
-
-    Web->>Server: GET /api/data (polling 1 detik)
-    Server-->>Web: JSON data terkini
-    Web->>Server: GET /api/cmd (kontrol dari pengguna)
+flowchart LR
+    A["🔬 4 Sensor Gas<br/>(via ADS1220)"] --> B["📡 ESP32<br/>kirim data mentah"]
+    B -- "HTTP POST /api/upload<br/>(JSON, setiap 1 detik)" --> C["⚙️ Server Node.js"]
+    C --> D["📐 Hitung Rs, Ratio, PPM"]
+    D --> E["💾 Simpan ke CSV"]
+    D --> F["🖥️ Tampilkan di Dashboard"]
+    C -. "cmd + val" .-> B
 ```
 
 **Penjelasan Alur:**
@@ -120,7 +99,7 @@ sequenceDiagram
 2. Data mentah dikirim setiap **1 detik** via **HTTP POST** ke `/api/upload`
 3. **Server** menghitung Rs, Ratio Rs/R₀, dan estimasi PPM menggunakan rumus power law
 4. Jika stream aktif, baris data ditulis ke **`dataset.csv`**
-5. Server mengembalikan **perintah kontrol** (`cmd`) yang dieksekusi ESP32 (heater on/off, reboot, dll.)
+5. Server mengembalikan **perintah kontrol** (`cmd`) ke ESP32 — misalnya: heater on/off, reboot
 6. **Dashboard web** polling `/api/data` setiap detik untuk menampilkan grafik dan status real-time
 
 ---
