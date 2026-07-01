@@ -113,8 +113,8 @@ flowchart LR
 | **SHT31** | Sensor suhu & kelembaban | I2C (`SDA=21`, `SCL=22`) |
 | **MQ-137** | Sensor gas NH₃ (tipe MQ, resistif) | ADS1220 Channel 0 |
 | **TGS-2602** | Sensor gas NH₃/VOC (tipe TGS, resistif) | ADS1220 Channel 3 |
-| **MiCS-NH3** | Sensor gas NH₃ (tipe MiCS, konduktif) | ADS1220 Channel 1 |
-| **MiCS-Red** | Sensor gas reduksi (tipe MiCS, konduktif) | ADS1220 Channel 2 |
+| **MiCS-NH3** | Sensor gas NH₃ (tipe MiCS, resistif) | ADS1220 Channel 1 |
+| **MiCS-Red** | Sensor gas reduksi (tipe MiCS, resistif) | ADS1220 Channel 2 |
 | **Heater MQ-137** | Elemen pemanas sensor MQ-137 | GPIO 25 |
 | **Heater TGS-2602** | Elemen pemanas sensor TGS-2602 | GPIO 26 |
 | **LED Status WiFi** | Indikator koneksi WiFi berhasil | GPIO 2 |
@@ -133,8 +133,8 @@ flowchart LR
 > 📐 **Perhitungan PPM** menggunakan rumus power law: **`PPM = A × (Rs/R₀)^B`**
 
 > 📐 **Rumus Rs** berbeda tiap tipe sensor:
-> - **MQ-137 & TGS-2602 (resistif):** `Rs = RL × (Vs − Vout) / Vout` — tegangan turun saat terpapar gas
-> - **MiCS-NH3 & MiCS-Red (konduktif):** `Rs = RL × Vout / (Vs − Vout)` — tegangan naik saat terpapar gas
+> - **MQ-137 & TGS-2602:** `Rs = RL × (Vs − Vout) / Vout` — tegangan naik saat terpapar gas
+> - **MiCS-NH3 & MiCS-Red:** `Rs = RL × Vout / (Vs − Vout)` — tegangan turun saat terpapar gas
 
 ---
 
